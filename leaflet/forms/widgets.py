@@ -12,6 +12,22 @@ try:
 except (ImportError, ImproperlyConfigured):
     from .backport import BaseGeometryWidget
 
+try:
+    # Django >=1.11
+    from django.forms.widgets import get_default_renderer
+except ImportError:
+    # Django <1.11
+    from django.template.loader import render_to_string
+
+
+    def get_default_renderer():
+        class DummyDjangoRenderer(object):
+            @staticmethod
+            def render(*args, **kwargs):
+                return render_to_string(*args, **kwargs)
+
+        return DummyDjangoRenderer
+
 from leaflet import app_settings, PLUGINS, PLUGIN_FORMS
 
 
@@ -79,7 +95,11 @@ class LeafletWidget(BaseGeometryWidget):
             context.update(self._get_attrs(name, attrs))
             return context
     else:
-        def render(self, name, value, attrs=None):
+        def render(self, name, value, attrs=None, renderer=None):
+
+            if renderer is None:
+                renderer = get_default_renderer()
+
             attrs = self._get_attrs(name, attrs)
             value = None if value in validators.EMPTY_VALUES else value
-            return super(LeafletWidget, self).render(name, value, attrs)
+            return super(LeafletWidget, self).render(name, value, attrs, renderer)
